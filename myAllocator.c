@@ -184,8 +184,9 @@ void arenaCheck() {		/* consistency check */
 BlockPrefix_t *findFirstFit(size_t s) {	/* find first block with usable space > s */
     BlockPrefix_t *p = arenaBegin;
     while (p) {
-	if (!p->allocated && computeUsableSpace(p) >= s)
-	    return p;
+      if (!p->allocated && computeUsableSpace(p) >= s){
+	return p;
+      }
 	p = getNextPrefix(p);
     }
     return growArena(s);
@@ -232,7 +233,50 @@ void *firstFitAllocRegion(size_t s) {
   }
   
 }
-
+BlockPrefix_t *findBestFit(size_t s){
+  BlockPrefix_t *p = arenaBegin;
+  BlockPrefix_t *bestFit = findFirstFit(s);
+  size_t bestFitSize = computeUsableSpace(bestFit);
+  short fitFound = 0;
+  if(bestFit){
+    fitFound = 1;
+  }
+  while(p){
+    size_t currentBlockSize = computeUsableSpace(p);
+    if(!p->allocated && currentBlockSize >= s &&  currentBlockSize <= bestFitSize){
+      fitFound = 1;
+      bestFit = p;
+      bestFitSize = currentBlockSize;
+    }
+    p = getNextPrefix(p);
+  }
+  if(fitFound == 1){
+    return bestFit;
+  }
+  return growArena(s);
+}
+void *bestFitAllocRegion(size_t s){
+  size_t alignedSize = align8(s);
+  BlockPrefix_t *p;
+  if(arenaBegin == 0){
+    initializeArena();
+  }
+  p = findBestFit(s);
+  if(p){
+    size_t availSize = computeUsableSpace(p);
+    if(availSize >= (alignedSize + prefixSize + suffixSize + 8)){
+      void *freeSliverStart = (void *)p + prefixSize + suffixSize + alignedSize;
+      void *freeSliverEnd = computeNextPrefixAddr(p);
+      makeFreeBlock(freeSliverStart, freeSliverEnd - freeSliverStart);
+      makeFreeBlock(p, freeSliverStart - (void *)p);
+    }
+    p->allocated = 1;
+    return prefixToRegion(p);
+  }else{
+    return (void *)0;
+  }
+  
+}
 void freeRegion(void *r) {
     if (r != 0) {
 	BlockPrefix_t *p = regionToPrefix(r); /* convert to block */
@@ -259,9 +303,16 @@ void *resizeRegion(void *r, size_t newSize) {
     oldSize = 0;		/* non-existant regions have size 0 */
   if (oldSize >= newSize)	/* old region is big enough */
     return r;
-  else {			/* allocate new region & copy old data */
+  else {
+    BlockPrefix_t *currentPrefix = regionToPrefix(r);
+    BlockPrefix_t *nextPrefix = computeNextPrefixAddr(currentPrefix);
+    if(!nextPrefix->allocated){
+      currentPrefix->suffix = currentPrefix->suffix + (newSize - oldSize);
+      return (void *)r;
+    }
+    /* allocate new region & copy old data */
     char *o = (char *)r;	/* treat both regions as char* */
-    char *n = (char *)firstFitAllocRegion(newSize); 
+    char *n = (char *)bestFitAllocRegion(newSize); 
     int i;
     for (i = 0; i < oldSize; i++) /* copy byte-by-byte, should use memcpy */
       n[i] = o[i];
