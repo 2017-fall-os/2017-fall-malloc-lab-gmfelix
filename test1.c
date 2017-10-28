@@ -31,6 +31,7 @@ int main()
   printf("%8zx %8zx %8zx\n", p1, p2, p3);
   arenaCheck();
   free(p2);
+  resizeRegion(p2, 20000);
   arenaCheck();
   free(p3);
   arenaCheck();

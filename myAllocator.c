@@ -306,11 +306,22 @@ void *resizeRegion(void *r, size_t newSize) {
   else {
     BlockPrefix_t *currentPrefix = regionToPrefix(r);
     BlockPrefix_t *nextPrefix = computeNextPrefixAddr(currentPrefix);
-    if(!nextPrefix->allocated){
-      currentPrefix->suffix = currentPrefix->suffix + (newSize - oldSize);
-      return (void *)r;
+    size_t nextPrefixSize = computeUsableSpace(nextPrefix);
+    if(!nextPrefix->allocated && (oldSize + nextPrefixSize) >= newSize){
+      coalescePrev(nextPrefix);
+      return (void *)currentPrefix;
     }
-    /* allocate new region & copy old data */
+    BlockPrefix_t *prevPrefix = getPrevPrefix(currentPrefix);
+    size_t prevPrefixSize = computeUsableSpace(prevPrefix);
+    if(!prevPrefix->allocated && (oldSize + prevPrefixSize) >= newSize){
+      coalescePrev(currentPrefix);
+      return (void *)currentPrefix;
+    }
+    if(!prevPrefix->allocated && !nextPrefix->allocated && (oldSize + prevPrefixSize + nextPrefixSize) >= newSize){
+      coalesce(currentPrefix);
+      return (void *)currentPrefix;
+    }
+      /* allocate new region & copy old data */
     char *o = (char *)r;	/* treat both regions as char* */
     char *n = (char *)bestFitAllocRegion(newSize); 
     int i;
