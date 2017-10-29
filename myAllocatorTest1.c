@@ -21,17 +21,20 @@ int main()
 {
   void *p1, *p2, *p3;
   arenaCheck();
-  p1 = firstFitAllocRegion(254);
+  p1 = bestFitAllocRegion(254);
   arenaCheck();
-  p2 = firstFitAllocRegion(25400);
+  p2 = bestFitAllocRegion(25400);
   arenaCheck();
-  p3 = firstFitAllocRegion(254);
+  p3 = bestFitAllocRegion(254);
   printf("%8zx %8zx %8zx\n", p1, p2, p3);
   arenaCheck();
   freeRegion(p2);
   arenaCheck();
+  resizeRegion(p1, 25400);
+  arenaCheck();
   freeRegion(p3);
   arenaCheck();
+  resizeRegion(p1, 25400);
   freeRegion(p1);
   arenaCheck();
   //{				/* measure time for 10000 mallocs */

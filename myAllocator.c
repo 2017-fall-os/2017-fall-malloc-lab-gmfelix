@@ -233,12 +233,14 @@ void *firstFitAllocRegion(size_t s) {
   }
   
 }
+//Finds the best fit in all of the arena
 BlockPrefix_t *findBestFit(size_t s){
-  BlockPrefix_t *p = arenaBegin;
-  BlockPrefix_t *bestFit = findFirstFit(s);
-  size_t bestFitSize = computeUsableSpace(bestFit);
+  BlockPrefix_t *p = arenaBegin;  
+  BlockPrefix_t *bestFit = findFirstFit(s); //We find the first fit and then compare it to the rest of the arena
   short fitFound = 0;
+  size_t bestFitSize = 0;
   if(bestFit){
+    bestFitSize = computeUsableSpace(bestFit);
     fitFound = 1;
   }
   while(p){
@@ -256,7 +258,7 @@ BlockPrefix_t *findBestFit(size_t s){
   return growArena(s);
 }
 void *bestFitAllocRegion(size_t s){
-  size_t alignedSize = align8(s);
+  size_t alignedSize = align8(s); 
   BlockPrefix_t *p;
   if(arenaBegin == 0){
     initializeArena();
@@ -308,22 +310,28 @@ void *resizeRegion(void *r, size_t newSize) {
     BlockPrefix_t *nextPrefix = computeNextPrefixAddr(currentPrefix);
     size_t nextPrefixSize = computeUsableSpace(nextPrefix);
     if(nextPrefix && !nextPrefix->allocated && (oldSize + nextPrefixSize) >= newSize){
+      currentPrefix->allocated = 0;
       coalescePrev(nextPrefix);
+      currentPrefix->allocated = 1;
       return (void *)currentPrefix;
     }
     BlockPrefix_t *prevPrefix = getPrevPrefix(currentPrefix);
     size_t prevPrefixSize = computeUsableSpace(prevPrefix);
     if(prevPrefix && !prevPrefix->allocated && (oldSize + prevPrefixSize) >= newSize){
+      currentPrefix->allocated = 0;
       coalescePrev(currentPrefix);
-      return (void *)currentPrefix;
+      currentPrefix->allocated = 1;
+      return (void *)prevPrefix;
     }
     if(prevPrefix && nextPrefix && !prevPrefix->allocated && !nextPrefix->allocated && (oldSize + prevPrefixSize + nextPrefixSize) >= newSize){
+      currentPrefix->allocated = 0;
       coalesce(currentPrefix);
-      return (void *)currentPrefix;
+      currentPrefix->allocated = 1;
+      return (void *)prevPrefix;
     }
       /* allocate new region & copy old data */
     char *o = (char *)r;	/* treat both regions as char* */
-    char *n = (char *)firstFitAllocRegion(newSize); 
+    char *n = (char *)bestFitAllocRegion(newSize); 
     int i;
     for (i = 0; i < oldSize; i++) /* copy byte-by-byte, should use memcpy */
       n[i] = o[i];
