@@ -310,6 +310,13 @@ void *resizeRegion(void *r, size_t newSize) {
     BlockPrefix_t *nextPrefix = computeNextPrefixAddr(currentPrefix);
     size_t nextPrefixSize = computeUsableSpace(nextPrefix);
     if(nextPrefix && !nextPrefix->allocated && (oldSize + nextPrefixSize) >= newSize){
+      size_t availSize = align8((newSize - computeUsableSpace(currentPrefix)));
+      if(nextPrefixSize >= (availSize + prefixSize + suffixSize + 8)){
+	void *freeSliverStart = (void *) nextPrefix + prefixSize + suffixSize + availSize;
+	void *freeSliverEnd = computeNextPrefixAddr(nextPrefix);
+	makeFreeBlock(freeSliverStart, freeSliverEnd - freeSliverStart);
+	makeFreeBlock(nextPrefix, freeSliverStart - (void *) nextPrefix);
+      }
       currentPrefix->allocated = 0;
       coalescePrev(nextPrefix);
       currentPrefix->allocated = 1;
@@ -318,12 +325,30 @@ void *resizeRegion(void *r, size_t newSize) {
     BlockPrefix_t *prevPrefix = getPrevPrefix(currentPrefix);
     size_t prevPrefixSize = computeUsableSpace(prevPrefix);
     if(prevPrefix && !prevPrefix->allocated && (oldSize + prevPrefixSize) >= newSize){
+      BlockPrefix_t *blockToCoalesce =  regionToPrefix(makeFreeBlock(prefixToRegion(prevPrefix), align8(newSize - oldSize)));
       currentPrefix->allocated = 0;
       coalescePrev(currentPrefix);
       currentPrefix->allocated = 1;
-      return (void *)prevPrefix;
+      return (void *)blockToCoalesce;
     }
     if(prevPrefix && nextPrefix && !prevPrefix->allocated && !nextPrefix->allocated && (oldSize + prevPrefixSize + nextPrefixSize) >= newSize){
+      BlockPrefix_t *prevBlock;
+      BlockPrefix_t *nextBlock;
+      if(prevPrefixSize < nextPrefixSize){
+	prevBlock = regionToPrefix(makeFreeBlock(prefixToRegion(prevPrefix), prevPrefixSize));
+	nextBlock = regionToPrefix(makeFreeBlock(prefixToRegion(nextPrefix), (newSize - oldSize - prevPrefixSize)));
+      }else{
+	nextBlock = makeFreeBlock(prefixToRegion(nextPrefix), nextPrefixSize);
+	prevBlock = makeFreeBlock(prefixToRegion(prevPrefix), (newSize - oldSize - nextPrefixSize));
+      }
+      size_t availSize = align8((newSize - computeUsableSpace(currentPrefix)));
+      if(nextPrefixSize >= (availSize + prefixSize + suffixSize + 8)){
+	void *freeSliverStart = (void *) nextBlock + prefixSize + suffixSize + availSize;
+	void *freeSliverEnd = computeNextPrefixAddr(nextPrefix);
+	makeFreeBlock(freeSliverStart, freeSliverEnd - freeSliverStart);
+	makeFreeBlock(nextBlock, freeSliverStart - (void *) nextBlock);
+      }
+					       
       currentPrefix->allocated = 0;
       coalesce(currentPrefix);
       currentPrefix->allocated = 1;

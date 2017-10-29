@@ -30,11 +30,11 @@ int main()
   arenaCheck();
   freeRegion(p2);
   arenaCheck();
-  resizeRegion(p1, 25400);
   arenaCheck();
   freeRegion(p3);
   arenaCheck();
-  resizeRegion(p1, 25400);
+  resizeRegion(p1, 2500);
+  arenaCheck();
   freeRegion(p1);
   arenaCheck();
   //{				/* measure time for 10000 mallocs */
